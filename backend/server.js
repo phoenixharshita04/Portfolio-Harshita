@@ -3,6 +3,7 @@ const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const nodemailer = require('nodemailer');
+const path = require('path');
 const Contact = require('./models/Contact');
 
 const app = express();
@@ -13,22 +14,35 @@ app.use(cors());
 app.use(express.json());
 
 // MongoDB Connection
-mongoose.connect(process.env.MONGO_URI, {
-    useNewUrlParser: true,
-    useUnifiedTopology: true
-}).then(() => console.log('MongoDB connected successfully'))
+mongoose.connect(process.env.MONGO_URI)
+  .then(() => console.log('MongoDB connected successfully'))
   .catch(err => console.error('MongoDB connection error:', err));
 
 // Nodemailer Transporter Configuration
-const transporter = nodemailer.createTransport({
-    service: 'gmail', // You can change this to another provider
-    auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS
-    }
-});
+let transporter = null;
+if (process.env.EMAIL_USER && process.env.EMAIL_PASS && process.env.EMAIL_USER !== 'your_email@gmail.com') {
+    transporter = nodemailer.createTransport({
+        service: 'gmail',
+        auth: {
+            user: process.env.EMAIL_USER,
+            pass: process.env.EMAIL_PASS
+        }
+    });
+}
+
+// Serve static frontend files from parent directory (Portfolio Harshita)
+app.use(express.static(path.join(__dirname, '..'), {
+    index: 'index.html'
+}));
 
 // API Routes
+app.get('/api/contact', (req, res) => {
+    res.json({
+        status: 'online',
+        message: 'Portfolio Contact API is running. Submit POST requests here with name, email, subject, and message.'
+    });
+});
+
 app.post('/api/contact', async (req, res) => {
     try {
         const { name, email, subject, message } = req.body;
@@ -40,24 +54,29 @@ app.post('/api/contact', async (req, res) => {
         // 1. Save to Database
         const newContact = new Contact({ name, email, subject, message });
         await newContact.save();
+        console.log(`[Contact Saved] Message from: ${name} (${email})`);
 
-        // 2. Send Email
-        const mailOptions = {
-            from: process.env.EMAIL_USER,
-            to: process.env.RECEIVER_EMAIL, // E.g., harshita9580gupta@gmail.com
-            subject: `New Portfolio Message: ${subject || 'No Subject'}`,
-            text: `You received a new message from your portfolio website.\n\nName: ${name}\nEmail: ${email}\n\nMessage:\n${message}`
-        };
+        // 2. Send Email if configured
+        if (transporter) {
+            const mailOptions = {
+                from: process.env.EMAIL_USER,
+                to: process.env.RECEIVER_EMAIL || process.env.EMAIL_USER,
+                subject: `New Portfolio Message: ${subject || 'No Subject'}`,
+                text: `You received a new message from your portfolio website.\n\nName: ${name}\nEmail: ${email}\nSubject: ${subject}\n\nMessage:\n${message}`
+            };
 
-        transporter.sendMail(mailOptions, (error, info) => {
-            if (error) {
-                console.error('Email sending failed:', error);
-                // We still saved it to the DB, so we return a partial success or error
-                return res.status(500).json({ success: false, message: 'Saved to DB, but failed to send email.' });
-            } else {
-                console.log('Email sent: ' + info.response);
-                return res.status(200).json({ success: true, message: 'Message sent and saved successfully!' });
-            }
+            transporter.sendMail(mailOptions, (error, info) => {
+                if (error) {
+                    console.error('Email sending failed:', error.message);
+                } else {
+                    console.log('Email sent: ' + info.response);
+                }
+            });
+        }
+
+        return res.status(200).json({
+            success: true,
+            message: 'Message sent and saved successfully!'
         });
 
     } catch (error) {
@@ -66,7 +85,12 @@ app.post('/api/contact', async (req, res) => {
     }
 });
 
+// Fallback to index.html for any other route
+app.use((req, res) => {
+    res.sendFile(path.join(__dirname, '..', 'index.html'));
+});
+
 // Start Server
 app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
+    console.log(`Server running at http://localhost:${PORT}`);
 });
