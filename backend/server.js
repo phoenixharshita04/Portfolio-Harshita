@@ -15,9 +15,10 @@ app.use(cors());
 app.use(express.json());
 
 // MongoDB Connection
-mongoose.connect(process.env.MONGO_URI)
-  .then(() => console.log('MongoDB connected successfully'))
-  .catch(err => console.error('MongoDB connection error:', err));
+mongoose.connect(process.env.MONGO_URI, {
+    serverSelectionTimeoutMS: 5000
+}).then(() => console.log('MongoDB connected successfully'))
+  .catch(err => console.error('MongoDB connection error:', err.message));
 
 // Nodemailer Transporter Configuration
 let transporter = null;
@@ -53,11 +54,18 @@ app.post('/api/contact', async (req, res) => {
         }
 
         // 1. Save to Database
-        const newContact = new Contact({ name, email, subject, message });
-        await newContact.save();
-        console.log(`[Contact Saved] Message from: ${name} (${email})`);
+        let dbSaved = false;
+        try {
+            const newContact = new Contact({ name, email, subject, message });
+            await newContact.save();
+            dbSaved = true;
+            console.log(`[Contact Saved] Message from: ${name} (${email})`);
+        } catch (dbError) {
+            console.error('[DB Save Error]:', dbError.message);
+        }
 
         // 2. Send Email if configured
+        let emailSent = false;
         if (transporter) {
             const mailOptions = {
                 from: process.env.EMAIL_USER,
@@ -66,23 +74,30 @@ app.post('/api/contact', async (req, res) => {
                 text: `You received a new message from your portfolio website.\n\nName: ${name}\nEmail: ${email}\nSubject: ${subject}\n\nMessage:\n${message}`
             };
 
-            transporter.sendMail(mailOptions, (error, info) => {
-                if (error) {
-                    console.error('Email sending failed:', error.message);
-                } else {
-                    console.log('Email sent: ' + info.response);
-                }
+            try {
+                const info = await transporter.sendMail(mailOptions);
+                console.log('Email sent:', info.response);
+                emailSent = true;
+            } catch (mailError) {
+                console.error('Email sending failed:', mailError.message);
+            }
+        }
+
+        if (dbSaved || emailSent) {
+            return res.status(200).json({
+                success: true,
+                message: 'Message sent and saved successfully!'
+            });
+        } else {
+            return res.status(500).json({
+                success: false,
+                message: 'Could not connect to MongoDB Atlas. Please ensure IP Access in MongoDB Atlas allows access from anywhere (0.0.0.0/0).'
             });
         }
 
-        return res.status(200).json({
-            success: true,
-            message: 'Message sent and saved successfully!'
-        });
-
     } catch (error) {
         console.error('Server error:', error);
-        res.status(500).json({ success: false, message: 'Server error processing your request.' });
+        res.status(500).json({ success: false, message: 'Server error processing your request: ' + error.message });
     }
 });
 
