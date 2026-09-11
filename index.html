@@ -715,6 +715,12 @@
     const subject = document.getElementById('formSubject').value.trim();
     const message = document.getElementById('formMessage').value.trim();
 
+    if (!name || !email || !message) {
+      status.textContent = '⚠️ Please fill in all required fields.';
+      status.className = 'mt-2 text-sm font-medium text-center text-amber-700 bg-amber-50 rounded-xl p-3';
+      return;
+    }
+
     btn.disabled = true;
     submitText.textContent = 'Sending...';
     submitIcon.className = 'fa-solid fa-spinner fa-spin text-xs';
@@ -724,16 +730,23 @@
     const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.protocol === 'file:';
     const apiUrl = isLocal ? 'http://localhost:5000/api/contact' : '/api/contact';
 
+    // 10-second timeout controller so the button never stays stuck
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
+
     try {
       const res = await fetch(apiUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, email, subject, message })
+        body: JSON.stringify({ name, email, subject, message }),
+        signal: controller.signal
       });
+      clearTimeout(timeoutId);
+
       const data = await res.json();
 
       if (data.success) {
-        status.textContent = '✅ Message sent and saved! Harshita will get back to you within 24 hours.';
+        status.textContent = '✅ ' + (data.message || 'Message sent and saved! Harshita will get back to you within 24 hours.');
         status.className = 'mt-2 text-sm font-medium text-center text-emerald-700 bg-emerald-50 rounded-xl p-3';
         e.target.reset();
       } else {
@@ -741,7 +754,12 @@
         status.className = 'mt-2 text-sm font-medium text-center text-amber-700 bg-amber-50 rounded-xl p-3';
       }
     } catch (err) {
-      status.textContent = '❌ Could not reach the server. Please email harshita9580gupta@gmail.com directly.';
+      clearTimeout(timeoutId);
+      if (err.name === 'AbortError') {
+        status.textContent = '⏱️ Request timed out. If using cloud, make sure MongoDB Atlas has 0.0.0.0/0 allowed.';
+      } else {
+        status.textContent = '❌ Could not reach backend server. Please make sure you are on http://localhost:5000.';
+      }
       status.className = 'mt-2 text-sm font-medium text-center text-red-700 bg-red-50 rounded-xl p-3';
     } finally {
       btn.disabled = false;
