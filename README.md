@@ -1,6 +1,8 @@
 # Harshita Gupta — Portfolio
 
-A full-stack portfolio website built with a static HTML frontend and a Node.js + Express backend.
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/phoenixharshita04/Portfolio-Harshita)
+
+A full-stack portfolio website built with a modern frontend and a Node.js + Express backend.
 
 ## 🚀 Tech Stack
 - **Frontend**: HTML5, Tailwind CSS, Vanilla JavaScript

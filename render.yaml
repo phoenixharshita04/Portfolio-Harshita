@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: portfolio-harshita
+    runtime: node
+    plan: free
+    buildCommand: cd backend && npm install
+    startCommand: node backend/server.js
+    envVars:
+      - key: MONGO_URI
+        value: mongodb+srv://adminharshy:Har353@cluster0.jelbpfl.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0
+      - key: RECEIVER_EMAIL
+        value: harshita9580gupta@gmail.com
+      - key: EMAIL_USER
+        sync: false
+      - key: EMAIL_PASS
+        sync: false
