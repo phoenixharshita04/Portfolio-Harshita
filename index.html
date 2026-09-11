@@ -720,8 +720,12 @@
     submitIcon.className = 'fa-solid fa-spinner fa-spin text-xs';
     status.className = 'hidden mt-2 text-sm font-medium text-center';
 
+    // Determine backend URL: local or production
+    const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.protocol === 'file:';
+    const apiUrl = isLocal ? 'http://localhost:5000/api/contact' : '/api/contact';
+
     try {
-      const res = await fetch('http://localhost:5000/api/contact', {
+      const res = await fetch(apiUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name, email, subject, message })
